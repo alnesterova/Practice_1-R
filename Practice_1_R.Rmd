@@ -1,0 +1,243 @@
+---
+title: "Упражнение 1"
+author: "Нестерова А.И."
+date: "17 02 2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Аналитический пакет R
+
+### Загрузка данных
+
+С помощью пакета rvest или парсинга XML с помощью xpath запросов соберите данные с
+сайта согласно своему варианту. В итоговой таблице должно быть не менее 50 записей и не менее 5 признаков, из которых как минимум два количественных. Снабдите файл справочником в формате Markdown.
+Результаты: .csv-файл с данными, .md-файл со справочником и .Rmd-файл с кодом
+загрузки данных разместить в репозитории github, ссылку на репозиторий прислать на
+почту преподавателя. Файл .Rmd должен содержать постановку задачи и комментарии по
+ходу сбора данных.
+
+### Вариант - 13
+
+Яндекс.Маркет, роботы-пылесосы (Москва).
+
+```{r Пакеты и директория, warning = F, message = F}
+# загрузка пакетов
+library('RCurl') # работа с HTML-страницами
+library('rvest') # работа с DOM сайта
+library('dplyr') # инструменты трансформирования данных
+
+data.dir <- './data'
+
+# создаём директорию для данных, если она ещё не существует:
+if (!file.exists(data.dir)) {
+  dir.create(data.dir)
+}
+
+# создаём файл с логом загрузок, если он ещё не существует:
+log.filename <- './data/download.log'
+if (!file.exists(log.filename)) file.create(log.filename)
+```
+
+Так как для выполнения задания необходимо выгрузить не менее 50 записей, а на Яндекс.Маркете можно отобразить данные только по 48 моделям роботов-пылесосов, осуществим сбор информации с двух страниц.
+
+```{r Ссылки, warning = F, message = F}
+# URL страницы для скраппинга
+url1 <- 'https://market.yandex.ru/catalog--roboty-pylesosy/83798/list?cpa=0&hid=16302536&suggest_text=%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D1%8B-%D0%BF%D1%8B%D0%BB%D0%B5%D1%81%D0%BE%D1%81%D1%8B&suggest=1&suggest_history=1&suggest_type=category&was_redir=1&rt=12&onstock=1&local-offers-first=0&viewtype=list'
+url2 <- 'https://market.yandex.ru/catalog--roboty-pylesosy/83798/list?cpa=0&hid=16302536&suggest_text=%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D1%8B-%D0%BF%D1%8B%D0%BB%D0%B5%D1%81%D0%BE%D1%81%D1%8B&suggest=1&suggest_history=1&suggest_type=category&was_redir=1&rt=12&onstock=1&page=2&local-offers-first=0&viewtype=list'
+
+# читаем HTML страницы
+webpage1 <- read_html(url1)
+webpage2 <- read_html(url2)
+```
+
+Теперь соберём со страницы следующие данные:
+  
+- `Title` - название модели робота-пылесоса;
+- `Description` - описание характеристик робота-пылесоса;
+- `Price` - цена робота-пылесоса (в рублях);
+- `Rank` - общий рейтинг робота-пылесоса на основе оценок покупателей;
+- `Feedback` - количество отзывов.
+
+### Отбор названий роботов-пылесосов по селектору
+
+```{r Названия, echo = F, message = F, warning = F}
+# скраппим страницу по селектору и преобразуем в текст (с двух страниц)
+title_data1 <- webpage1 %>% html_nodes('.cLo1fZHm2y') %>% html_text
+title_data2 <- webpage2 %>% html_nodes('.cLo1fZHm2y') %>% html_text
+# объединяем записи в один вектор
+title_data <- c(title_data1, title_data2)
+
+# определяем количество записей
+length(title_data)
+# выводим на экран первые записи
+head(title_data)
+```
+
+### Селектор для описания роботов-пылесосов
+
+```{r Описание, echo = F, message = F, warning = F}
+# скраппим страницу по селектору и преобразуем в текст
+description_data1 <- webpage1 %>% html_nodes('._2_oj-OEI-o') %>% 
+  html_text()
+description_data2 <- webpage2 %>% html_nodes('._2_oj-OEI-o') %>% 
+  html_text()
+# объединяем записи в один вектор
+description_data <- c(description_data1, description_data2)
+
+# определяем количество записей
+length(description_data)
+# выводим на экран первые записи
+head(description_data)
+```
+### Cелектор для цен роботов-пылесосов
+
+```{r Цена, echo = F, message = F, warning = F}
+# скраппим страницу по селектору и преобразуем в текст
+price_data1 <- webpage1 %>% html_nodes('._3f2ZtYT7NH') %>% 
+  html_text()
+price_data2 <- webpage2 %>% html_nodes('._3f2ZtYT7NH') %>% 
+  html_text()
+# объединяем записи в один вектор
+price_data <- c(price_data1, price_data2)
+# определяем количество записей
+length(price_data)
+
+# убираем название валюты из вектора
+price_data <- gsub("[^[:digit:]]", "", price_data)
+
+# конвертируем цены в числовые данные
+price_data <- as.numeric(price_data)
+# выводим на экран первые записи
+head(price_data)
+```
+
+### Cелектор для общего рейтинга на основе оценок покупателей
+
+```{r Рейтинг, echo = F, message = F, warning = F}
+# скраппим страницу по селектору и преобразуем в текст (для 1-ой страницы)
+rank_data1 <- webpage1 %>% html_nodes('._1iKHblnc3a') %>% 
+  html_text()
+# проверяем количество записей 
+length(rank_data1)
+
+# так как количество записей о рейтинге меньше, чем количество объктов на странице (48)
+# (некоторые товары являются новыми, а значит количество оценок пользователей недостаточно для составления рейтинга),
+# необходимо обозначить пустые значения
+
+# функция перебора тегов внутри тегов более высокого уровня
+get_tags <- function(node){
+  # найти все теги с рейтингом
+  raw_data <- html_nodes(node, selector) %>% html_text
+  # значения нулевой длины меняем на пропуски
+  data_NAs <- ifelse(length(raw_data) == 0, NA, raw_data)
+}
+
+# это глобальная переменная будет неявно передана функции get_tags()
+selector <- '._1iKHblnc3a'
+# находим все ноды (теги) верхнего уровня, с информацией о каждом роботе-пылесосе
+webpage1_1 <- html_nodes(webpage1, '._1B9w_GzQuM')
+# применяем к этим тегам поиск рейтинга и ставим NA там, где тега нет
+rank_data1 <- sapply(webpage1_1, get_tags)
+
+# для 2-ой страницы
+rank_data2 <- webpage2 %>% html_nodes('._1iKHblnc3a') %>% 
+  html_text()
+# проверяем количество записей 
+length(rank_data2)
+
+# находим все ноды (теги) верхнего уровня, с информацией о каждом роботе-пылесосе
+webpage2_2 <- html_nodes(webpage2, '._1B9w_GzQuM')
+# применяем к этим тегам поиск рейтинга и ставим NA там, где тега нет
+rank_data2 <- sapply(webpage2_2, get_tags)
+
+# объединяем записи в один вектор
+rank_data <- c(rank_data1, rank_data2)
+
+# предварительный результат
+# определяем количество записей
+length(rank_data)
+# выводим на экран первые записи
+head(rank_data)
+
+# конвертируем цены в числовые данные
+rank_data <- as.numeric(rank_data)
+# выводим на экран первые записи
+head(rank_data)
+```
+
+### Селектор для количества отзывов
+
+```{r Отзывы, echo = F, message = F, warning = F}
+# скраппим страницу по селектору и преобразуем в текст (для 1-ой страницы)
+feedback_data1 <- webpage1 %>% html_nodes('.KdrkCVDrVm') %>% 
+  html_text()
+# проверяем количество записей 
+length(feedback_data1)
+
+# так как количество записей о числе отзывов меньше, чем количество объктов на странице (48) (из-за появления новинок),
+# необходимо обозначить пустые значения
+
+# это глобальная переменная будет неявно передана функции get_tags()
+selector <- '.KdrkCVDrVm'
+# находим все ноды (теги) верхнего уровня, с информацией о каждом фильме
+webpage1_1 <- html_nodes(webpage1, '._1B9w_GzQuM')
+# применяем к этим тегам поиск количества отзывов и ставим NA там, где тега нет
+feedback_data1 <- sapply(webpage1_1, get_tags)
+
+# для 2-ой страницы
+feedback_data2 <- webpage2 %>% html_nodes('.KdrkCVDrVm') %>% 
+  html_text()
+# проверяем количество записей
+length(feedback_data2)
+
+# это глобальная переменная будет неявно передана функции get_tags()
+selector <- '.KdrkCVDrVm'
+# находим все ноды (теги) верхнего уровня, с информацией о каждом фильме
+webpage2_2 <- html_nodes(webpage2, '._1B9w_GzQuM')
+# применяем к этим тегам поиск количества отзывов и ставим NA там, где тега нет
+feedback_data2 <- sapply(webpage2_2, get_tags)
+
+# объединяем записи в один вектор
+feedback_data <- c(feedback_data1, feedback_data2)
+
+# предварительный результат
+# определяем количество записей
+length(feedback_data)
+# выводим на экран первые записи
+head(feedback_data)
+
+# убираем слово "Отзывы" из вектора
+feedback_data<- gsub("[^[:digit:]]", "", feedback_data)
+
+# конвертируем число отзывов в числовые данные
+feedback_data <- as.numeric(feedback_data)
+# выводим на экран первые записи
+head(feedback_data)
+```
+
+### Составление общего фрейма
+
+```{r Фрейм, echo = F, message = F, warning = F}
+# совмещаем данные в один фрейм
+DF_vacuum_cleaners <- data.frame(Title = title_data, 
+                                 Description = description_data, 
+                                 Price = price_data, 
+                                 Rank = rank_data,  Feedback = feedback_data)
+# результат
+dim(DF_vacuum_cleaners)
+str(DF_vacuum_cleaners)
+
+# записываем в .csv
+write.csv(DF_vacuum_cleaners, file = './data//DF_vacuum_cleaners.csv', row.names = F)
+# сделать запись в лог
+write(paste('Файл "DF_vacuum_cleaners.csv" записан', Sys.time()), 
+      file = log.filename, append = T)
+
+```
+
