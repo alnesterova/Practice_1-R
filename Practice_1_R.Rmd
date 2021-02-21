@@ -82,7 +82,7 @@ head(title_data)
 ### Селектор для описания роботов-пылесосов
 
 ```{r Описание, echo = F, message = F, warning = F}
-# скраппим страницу по селектору и преобразуем в текст
+# скраппим страницу по селектору и преобразуем в текст (с двух страниц)
 description_data1 <- webpage1 %>% html_nodes('._2_oj-OEI-o') %>% 
   html_text()
 description_data2 <- webpage2 %>% html_nodes('._2_oj-OEI-o') %>% 
@@ -98,7 +98,7 @@ head(description_data)
 ### Cелектор для цен роботов-пылесосов
 
 ```{r Цена, echo = F, message = F, warning = F}
-# скраппим страницу по селектору и преобразуем в текст
+# скраппим страницу по селектору и преобразуем в текст (с двух страниц)
 price_data1 <- webpage1 %>% html_nodes('._3f2ZtYT7NH') %>% 
   html_text()
 price_data2 <- webpage2 %>% html_nodes('._3f2ZtYT7NH') %>% 
